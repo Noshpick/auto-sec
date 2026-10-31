@@ -1,70 +1,78 @@
 # auto-sec
 
-[![ShellCheck](https://github.com/Noshpick/auto-sec/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/Noshpick/auto-sec/actions/workflows/shellcheck.yml)
+![ShellCheck](https://github.com/Noshpick/auto-sec/actions/workflows/shellcheck.yml/badge.svg)
 
-Интерактивный bash-скрипт для первичной настройки и защиты свежего Ubuntu/Debian сервера.
-За пару минут превращает «голый» VPS в сервер с разумной базовой безопасностью.
+**[Русский](README.ru.md)**
 
-## Что делает
+Interactive bash script for initial setup and hardening of a fresh Ubuntu/Debian server.
+Turns a bare VPS into a server with sensible baseline security in a couple of minutes.
 
-- Создаёт непривилегированного пользователя с `sudo` и SSH-ключом (имя спрашивает интерактивно, с подтверждением)
-- Переводит SSH на нестандартный порт (спрашивает, по умолчанию `2222`), запрещает вход под root и по паролю - только по ключу
-- Включает firewall (`ufw`): запрещено всё входящее, кроме SSH
-- Ставит и настраивает `fail2ban`: 5 неудачных попыток входа за 10 минут - бан на час
-- Включает автоматические обновления безопасности (`unattended-upgrades`)
-- Опционально устанавливает Docker
+## What it does
 
-Перед изменением SSH делает бэкап конфига (`/etc/ssh/sshd_config.bak.*`) и проверяет
-новый конфиг командой `sshd -t` **до** перезапуска сервиса - вы не потеряете доступ к серверу.
+- Creates a non-privileged user with `sudo` and an SSH key (asks for the name interactively, with confirmation)
+- Moves SSH to a custom port (asks, default `2222`), disables root and password login - key only
+- Enables the firewall (`ufw`): denies everything inbound except SSH
+- Installs and configures `fail2ban`: 5 failed login attempts in 10 minutes = 1 hour ban
+- Enables automatic security updates (`unattended-upgrades`)
+- Optionally installs Docker
 
-## Требования
+Before touching SSH it backs up the config (`/etc/ssh/sshd_config.bak.*`) and validates
+the new config with `sshd -t` **before** restarting the service - you will not lock yourself out.
 
-- Ubuntu или Debian (свежая установка)
-- Доступ по SSH под root (или пользователем с sudo)
-- Ваш публичный SSH-ключ (`~/.ssh/id_ed25519.pub` на вашем компьютере)
+## Requirements
 
-## Установка и запуск
+- Ubuntu or Debian (fresh install)
+- SSH access as root (or a user with sudo)
+- Your public SSH key (`~/.ssh/id_ed25519.pub` on your machine)
 
-### Быстрый способ
+## Install and run
+
+### Quick way
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Noshpick/auto-sec/main/auto-sec.sh | sudo bash
 ```
 
-### Установка как системная команда
+Russian version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Noshpick/auto-sec/main/auto-sec-ru.sh | sudo bash
+```
+
+### Install as a system command
 
 ```bash
 sudo bash install.sh
-# дальше можно запускать откуда угодно:
+# then run from anywhere:
 sudo auto-sec
 ```
 
-## После запуска
+## After it finishes
 
-Скрипт в конце напечатает команду для проверки:
+The script prints a verification command at the end:
 
 ```bash
-ssh -p <порт> <пользователь>@<ip-сервера>
+ssh -p <port> <user>@<server-ip>
 ```
 
-**Не закрывайте текущую сессию**, пока не войдёте в новую и не убедитесь, что всё работает.
+**Do not close your current session** until you have logged in with a new one and verified everything works.
 
-## Как откатить изменения
+## How to roll back
 
 ```bash
-# Вернуть старый конфиг SSH
+# Restore the old SSH config
 sudo cp /etc/ssh/sshd_config.bak.YYYYMMDDHHMMSS /etc/ssh/sshd_config
 sudo rm /etc/ssh/sshd_config.d/99-auto-sec.conf
 sudo systemctl restart ssh
 
-# Выключить firewall
+# Disable the firewall
 sudo ufw disable
 ```
 
-## Безопасность проекта
+## Project security
 
-Скрипт проверен `shellcheck`. Нашли уязвимость или ошибку - откройте issue.
+The script is checked with `shellcheck` on every commit. Found a vulnerability or a bug - please open an issue.
 
-## Лицензия
+## License
 
-MIT - см. [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).

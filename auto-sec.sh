@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# auto-sec - первичная настройка и защита Ubuntu/Debian сервера
-# Репозиторий: https://github.com/Noshpick/auto-sec
+# auto-sec - initial setup and hardening of an Ubuntu/Debian server
+# Repository: https://github.com/Noshpick/auto-sec
 # =============================================================================
 
 set -euo pipefail
@@ -30,42 +30,42 @@ ask_yes_no() {
         case "$answer" in
             y|Y|yes|YES) return 0 ;;
             ""|n|N|no|NO) return 1 ;;
-            *) echo "Ответь y (да) или n (нет), Enter = нет." ;;
+            *) echo "Answer y (yes) or n (no), Enter = no." ;;
         esac
     done
 }
 
 ask_username() {
     while true; do
-        read -r -p "Введи имя нового пользователя: " NEW_USER < /dev/tty
+        read -r -p "Enter a name for the new user: " NEW_USER < /dev/tty
 
         if [[ -z "$NEW_USER" ]]; then
-            echo "Имя не может быть пустым. Попробуй ещё раз."
+            echo "The name cannot be empty. Try again."
             continue
         fi
 
         if [[ ! "$NEW_USER" =~ ^[a-z][a-z0-9_-]{0,31}$ ]]; then
-            echo "Имя должно начинаться с маленькой латинской буквы и"
-            echo "содержать только маленькие буквы, цифры, дефис и подчёркивание."
+            echo "The name must start with a lowercase Latin letter and"
+            echo "contain only lowercase letters, digits, hyphens and underscores."
             continue
         fi
 
         local confirm
-        read -r -p "Повтори имя для подтверждения: " confirm < /dev/tty
+        read -r -p "Repeat the name to confirm: " confirm < /dev/tty
 
         if [[ "$NEW_USER" == "$confirm" ]]; then
             break
         else
-            echo "Имена не совпадают! Попробуй ещё раз."
+            echo "Names do not match! Try again."
         fi
     done
 
-    log "Имя подтверждено: $NEW_USER"
+    log "Username confirmed: $NEW_USER"
 }
 
 ask_ssh_port() {
     while true; do
-        read -r -p "Введи SSH-порт [по умолчанию $DEFAULT_SSH_PORT]: " SSH_PORT < /dev/tty
+        read -r -p "Enter the SSH port [default $DEFAULT_SSH_PORT]: " SSH_PORT < /dev/tty
 
         if [[ -z "$SSH_PORT" ]]; then
             SSH_PORT="$DEFAULT_SSH_PORT"
@@ -73,19 +73,19 @@ ask_ssh_port() {
         fi
 
         if [[ ! "$SSH_PORT" =~ ^[0-9]+$ ]]; then
-            echo "Порт должен быть числом. Попробуй ещё раз."
+            echo "The port must be a number. Try again."
             continue
         fi
 
         if (( SSH_PORT < 1 || SSH_PORT > 65535 )); then
-            echo "Порт должен быть от 1 до 65535. Попробуй ещё раз."
+            echo "The port must be between 1 and 65535. Try again."
             continue
         fi
 
         if (( SSH_PORT < 1024 )); then
-            warn "Порт $SSH_PORT из системного диапазона (1-1023). Это может конфликтовать"
-            warn "с другими сервисами (например, 80 - веб-сервер, 443 - HTTPS)."
-            if ask_yes_no "Ты уверен, что хочешь порт $SSH_PORT?"; then
+            warn "Port $SSH_PORT is in the system range (1-1023). It may conflict"
+            warn "with other services (e.g. 80 - web server, 443 - HTTPS)."
+            if ask_yes_no "Are you sure you want port $SSH_PORT?"; then
                 break
             else
                 continue
@@ -95,53 +95,53 @@ ask_ssh_port() {
         break
     done
 
-    log "SSH-порт: $SSH_PORT"
+    log "SSH port: $SSH_PORT"
 }
 
 ask_ssh_key() {
     if [[ -f /root/.ssh/authorized_keys ]]; then
-        if ask_yes_no "У root уже есть SSH-ключ. Использовать его для $NEW_USER?"; then
+        if ask_yes_no "Root already has an SSH key. Use it for $NEW_USER?"; then
             SSH_PUBKEY=$(head -n 1 /root/.ssh/authorized_keys)
-            log "Будет использован ключ root"
+            log "Root's key will be used"
             return
         fi
     fi
 
-    echo "Вставь свой ПУБЛИЧНЫЙ ключ (начинается с ssh-ed25519 или ssh-rsa)."
-    echo "Он лежит на твоём компьютере в ~/.ssh/id_ed25519.pub"
+    echo "Paste your PUBLIC key (starts with ssh-ed25519 or ssh-rsa)."
+    echo "It lives on your computer in ~/.ssh/id_ed25519.pub"
     while true; do
-        read -r -p "Публичный ключ: " SSH_PUBKEY < /dev/tty
+        read -r -p "Public key: " SSH_PUBKEY < /dev/tty
 
         if [[ -z "$SSH_PUBKEY" ]]; then
-            echo "Ключ не может быть пустым."
+            echo "The key cannot be empty."
             continue
         fi
 
         if [[ "$SSH_PUBKEY" =~ ^ssh- ]]; then
             break
         else
-            echo "Это не похоже на публичный ключ (должен начинаться с ssh-...)."
+            echo "This does not look like a public key (it should start with ssh-...)."
         fi
     done
 
-    log "Ключ принят"
+    log "Key accepted"
 }
 
 ask_web_ports() {
-    if ask_yes_no "Планируешь поднимать веб-сервер? (открыть порты 80 и 443)"; then
+    if ask_yes_no "Planning to run a web server? (open ports 80 and 443)"; then
         OPEN_WEB_PORTS="yes"
-        log "Порты 80 (HTTP) и 443 (HTTPS) будут открыты"
+        log "Ports 80 (HTTP) and 443 (HTTPS) will be opened"
     else
-        log "Веб-порты открывать не будем (только SSH)"
+        log "Web ports will stay closed (SSH only)"
     fi
 }
 
 ask_maxretry() {
-    echo "Fail2ban банит IP-адрес после нескольких неудачных попыток входа."
-    echo "Рекомендуем $DEFAULT_MAXRETRY попыток: этого хватит, чтобы случайная опечатка"
-    echo "не забанила тебя самого, но ботов с перебором паролей остановит."
+    echo "Fail2ban bans an IP address after several failed login attempts."
+    echo "We recommend $DEFAULT_MAXRETRY attempts: enough that a random typo"
+    echo "won't ban you, but brute-force bots get stopped."
     while true; do
-        read -r -p "Сколько попыток до бана? [по умолчанию $DEFAULT_MAXRETRY]: " F2B_MAXRETRY < /dev/tty
+        read -r -p "How many attempts before a ban? [default $DEFAULT_MAXRETRY]: " F2B_MAXRETRY < /dev/tty
 
         if [[ -z "$F2B_MAXRETRY" ]]; then
             F2B_MAXRETRY="$DEFAULT_MAXRETRY"
@@ -149,39 +149,39 @@ ask_maxretry() {
         fi
 
         if [[ ! "$F2B_MAXRETRY" =~ ^[0-9]+$ ]]; then
-            echo "Нужно число. Попробуй ещё раз."
+            echo "A number is required. Try again."
             continue
         fi
 
         if (( F2B_MAXRETRY < 1 || F2B_MAXRETRY > 100 )); then
-            echo "Введи число от 1 до 100. Попробуй ещё раз."
+            echo "Enter a number from 1 to 100. Try again."
             continue
         fi
 
         break
     done
 
-    log "Fail2ban: бан после $F2B_MAXRETRY неудачных попыток"
+    log "Fail2ban: ban after $F2B_MAXRETRY failed attempts"
 }
 
 update_system() {
-    log "Обновляю систему (это может занять пару минут)..."
+    log "Updating the system (this may take a couple of minutes)..."
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y
     apt-get upgrade -y
     apt-get install -y curl wget git htop vim ufw fail2ban unattended-upgrades
 
-    timedatectl set-timezone "$TIMEZONE" || warn "Не смог выставить таймзону $TIMEZONE"
-    log "Система обновлена"
+    timedatectl set-timezone "$TIMEZONE" || warn "Could not set timezone $TIMEZONE"
+    log "System updated"
 }
 
 create_user() {
     if id "$NEW_USER" &>/dev/null; then
-        warn "Пользователь $NEW_USER уже существует, пропускаю создание"
+        warn "User $NEW_USER already exists, skipping creation"
     else
         adduser --disabled-password --gecos "" "$NEW_USER"
         usermod -aG sudo "$NEW_USER"
-        log "Пользователь $NEW_USER создан и добавлен в группу sudo"
+        log "User $NEW_USER created and added to the sudo group"
     fi
 
     local user_home
@@ -193,7 +193,7 @@ create_user() {
     chmod 600 "$user_home/.ssh/authorized_keys"
     chown -R "$NEW_USER:$NEW_USER" "$user_home/.ssh"
 
-    log "SSH-ключ установлен для $NEW_USER"
+    log "SSH key installed for $NEW_USER"
 }
 
 setup_ssh() {
@@ -202,6 +202,7 @@ setup_ssh() {
     cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.bak.$(date +%Y%m%d%H%M%S)"
 
     cat > "$dropin" <<EOF
+# --- settings from auto-sec ---
 Port $SSH_PORT
 PermitRootLogin no
 PasswordAuthentication no
@@ -214,10 +215,10 @@ X11Forwarding no
 AllowUsers $NEW_USER
 EOF
 
-    sshd -t || die "Ошибка в конфиге sshd! Сервис не перезапущен, доступ не потерян."
+    sshd -t || die "Error in the sshd config! Service not restarted, access not lost."
 
     systemctl restart ssh
-    log "SSH настроен: порт $SSH_PORT, вход только по ключу, root запрещён"
+    log "SSH configured: port $SSH_PORT, key-only login, root login disabled"
 }
 
 setup_firewall() {
@@ -234,9 +235,9 @@ setup_firewall() {
     ufw --force enable
 
     if [[ "$OPEN_WEB_PORTS" == "yes" ]]; then
-        log "Firewall включён: открыты порты $SSH_PORT (SSH), 80 (HTTP), 443 (HTTPS)"
+        log "Firewall enabled: ports $SSH_PORT (SSH), 80 (HTTP), 443 (HTTPS) open"
     else
-        log "Firewall включён: открыт только порт $SSH_PORT (SSH)"
+        log "Firewall enabled: only port $SSH_PORT (SSH) open"
     fi
 }
 
@@ -255,7 +256,7 @@ EOF
 
     systemctl enable fail2ban
     systemctl restart fail2ban
-    log "Fail2ban настроен: $F2B_MAXRETRY неудачных попыток за 10 минут = бан на час"
+    log "Fail2ban configured: $F2B_MAXRETRY failed attempts in 10 minutes = 1 hour ban"
 }
 
 setup_auto_updates() {
@@ -266,28 +267,28 @@ APT::Periodic::AutocleanInterval "7";
 EOF
     systemctl enable unattended-upgrades
     systemctl restart unattended-upgrades
-    log "Автообновления безопасности включены"
+    log "Automatic security updates enabled"
 }
 
 install_docker() {
     if command -v docker >/dev/null; then
-        warn "Docker уже установлен, пропускаю"
+        warn "Docker is already installed, skipping"
         return
     fi
     curl -fsSL https://get.docker.com | sh
     usermod -aG docker "$NEW_USER"
     systemctl enable docker
-    log "Docker установлен, $NEW_USER добавлен в группу docker"
+    log "Docker installed, $NEW_USER added to the docker group"
 }
 
 if [[ $EUID -ne 0 ]]; then
-    die "Запусти меня через sudo:  sudo bash auto-sec.sh"
+    die "Run me with sudo:  sudo bash auto-sec.sh"
 fi
 
 echo "============================================================"
-echo "              auto-sec - настройка и защита сервера"
+echo "          auto-sec - server setup and hardening"
 echo "============================================================"
-warn "Не закрывай эту сессию, пока не проверишь новый SSH-доступ!"
+warn "Do not close this session until you verify the new SSH access!"
 echo
 
 ask_username
@@ -296,12 +297,12 @@ ask_ssh_key
 ask_web_ports
 ask_maxretry
 
-if ask_yes_no "Установить Docker?"; then
+if ask_yes_no "Install Docker?"; then
     INSTALL_DOCKER="yes"
 fi
 
 echo
-log "Начинаю настройку. Пользователь: $NEW_USER, SSH-порт: $SSH_PORT"
+log "Starting setup. User: $NEW_USER, SSH port: $SSH_PORT"
 echo
 
 update_system
@@ -318,10 +319,10 @@ fi
 SERVER_IP=$(hostname -I | awk '{print $1}')
 echo
 echo "============================================================"
-log "Готово! Теперь проверь вход, НЕ ЗАКРЫВАЯ эту сессию:"
+log "Done! Now verify the login WITHOUT closing this session:"
 echo
 echo "    ssh -p $SSH_PORT $NEW_USER@$SERVER_IP"
 echo
-echo "  Если вошёл - всё работает, можно закрывать эту сессию."
-echo "  Если нет - старый конфиг лежит рядом: /etc/ssh/sshd_config.bak.*"
+echo "  If you got in - everything works, you can close this session."
+echo "  If not - the old config is nearby: /etc/ssh/sshd_config.bak.*"
 echo "============================================================"
