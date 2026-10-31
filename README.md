@@ -1,5 +1,7 @@
 # auto-sec
 
+[![ShellCheck](https://github.com/Noshpick/auto-sec/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/Noshpick/auto-sec/actions/workflows/shellcheck.yml)
+
 Интерактивный bash-скрипт для первичной настройки и защиты свежего Ubuntu/Debian сервера.
 За пару минут превращает «голый» VPS в сервер с разумной базовой безопасностью.
 
