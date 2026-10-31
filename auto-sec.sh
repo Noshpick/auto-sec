@@ -26,7 +26,7 @@ ask_yes_no() {
     local question="$1"
     local answer
     while true; do
-        read -r -p "$question [y/N]: " answer
+        read -r -p "$question [y/N]: " answer < /dev/tty
         case "$answer" in
             y|Y|yes|YES) return 0 ;;
             ""|n|N|no|NO) return 1 ;;
@@ -37,7 +37,7 @@ ask_yes_no() {
 
 ask_username() {
     while true; do
-        read -r -p "Введи имя нового пользователя: " NEW_USER
+        read -r -p "Введи имя нового пользователя: " NEW_USER < /dev/tty
 
         if [[ -z "$NEW_USER" ]]; then
             echo "Имя не может быть пустым. Попробуй ещё раз."
@@ -51,7 +51,7 @@ ask_username() {
         fi
 
         local confirm
-        read -r -p "Повтори имя для подтверждения: " confirm
+        read -r -p "Повтори имя для подтверждения: " confirm < /dev/tty
 
         if [[ "$NEW_USER" == "$confirm" ]]; then
             break
@@ -65,7 +65,7 @@ ask_username() {
 
 ask_ssh_port() {
     while true; do
-        read -r -p "Введи SSH-порт [по умолчанию $DEFAULT_SSH_PORT]: " SSH_PORT
+        read -r -p "Введи SSH-порт [по умолчанию $DEFAULT_SSH_PORT]: " SSH_PORT < /dev/tty
 
         if [[ -z "$SSH_PORT" ]]; then
             SSH_PORT="$DEFAULT_SSH_PORT"
@@ -110,7 +110,7 @@ ask_ssh_key() {
     echo "Вставь свой ПУБЛИЧНЫЙ ключ (начинается с ssh-ed25519 или ssh-rsa)."
     echo "Он лежит на твоём компьютере в ~/.ssh/id_ed25519.pub"
     while true; do
-        read -r -p "Публичный ключ: " SSH_PUBKEY
+        read -r -p "Публичный ключ: " SSH_PUBKEY < /dev/tty
 
         if [[ -z "$SSH_PUBKEY" ]]; then
             echo "Ключ не может быть пустым."
@@ -141,7 +141,7 @@ ask_maxretry() {
     echo "Рекомендуем $DEFAULT_MAXRETRY попыток: этого хватит, чтобы случайная опечатка"
     echo "не забанила тебя самого, но ботов с перебором паролей остановит."
     while true; do
-        read -r -p "Сколько попыток до бана? [по умолчанию $DEFAULT_MAXRETRY]: " F2B_MAXRETRY
+        read -r -p "Сколько попыток до бана? [по умолчанию $DEFAULT_MAXRETRY]: " F2B_MAXRETRY < /dev/tty
 
         if [[ -z "$F2B_MAXRETRY" ]]; then
             F2B_MAXRETRY="$DEFAULT_MAXRETRY"
