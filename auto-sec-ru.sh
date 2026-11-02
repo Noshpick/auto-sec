@@ -313,9 +313,77 @@ install_docker() {
     log "Docker установлен, $NEW_USER добавлен в группу docker"
 }
 
+OK_COUNT=0
+BAD_COUNT=0
+
+check_item() {
+    if [[ "$2" -eq 0 ]]; then
+        echo -e "${GREEN}[OK]${NC} $1"
+        (( OK_COUNT+=1 ))
+    else
+        echo -e "${RED}[!!]${NC} $1"
+        (( BAD_COUNT+=1 ))
+    fi
+}
+
+audit_report() {
+    echo "============================================================"
+    echo "              auto-sec - аудит сервера"
+    echo "============================================================"
+
+    local sshd_conf st
+    sshd_conf=$(sshd -T 2>/dev/null || true)
+
+    local port root_login pass_auth
+    port=$(awk '/^port /{print $2}' <<< "$sshd_conf")
+    root_login=$(awk '/^permitrootlogin /{print $2}' <<< "$sshd_conf")
+    pass_auth=$(awk '/^passwordauthentication /{print $2}' <<< "$sshd_conf")
+
+    [[ "$port" != "22" ]] && st=0 || st=1
+    check_item "SSH на нестандартном порту (сейчас: ${port:-неизвестно})" "$st"
+
+    [[ "$root_login" == "no" ]] && st=0 || st=1
+    check_item "Вход под root запрещён" "$st"
+
+    [[ "$pass_auth" == "no" ]] && st=0 || st=1
+    check_item "Вход по паролю запрещён (только ключи)" "$st"
+
+    ufw status 2>/dev/null | grep -q "Status: active" && st=0 || st=1
+    check_item "Firewall (ufw) включён" "$st"
+
+    systemctl is-active --quiet fail2ban && st=0 || st=1
+    check_item "Fail2ban запущен" "$st"
+
+    systemctl is-enabled --quiet fail2ban && st=0 || st=1
+    check_item "Fail2ban в автозагрузке" "$st"
+
+    [[ -f /etc/apt/apt.conf.d/20auto-upgrades ]] && st=0 || st=1
+    check_item "Автообновления безопасности настроены" "$st"
+
+    local updates
+    updates=$(apt-get -s upgrade 2>/dev/null | grep -c '^Inst' || true)
+    [[ "$updates" == "0" ]] && st=0 || st=1
+    check_item "Система обновлена (доступно обновлений: $updates)" "$st"
+
+    echo "============================================================"
+    if (( BAD_COUNT == 0 )); then
+        echo -e "${GREEN}Итог: $OK_COUNT/$((OK_COUNT + BAD_COUNT)) - сервер в порядке${NC}"
+    else
+        echo -e "${YELLOW}Итог: $OK_COUNT/$((OK_COUNT + BAD_COUNT)) - есть $BAD_COUNT проблем, запусти auto-sec для настройки${NC}"
+    fi
+    echo "============================================================"
+}
+
 if [[ $EUID -ne 0 ]]; then
     die "Запусти меня через sudo:  sudo bash auto-sec.sh"
 fi
+
+case "${1:-}" in
+    --check)
+        audit_report
+        exit 0
+        ;;
+esac
 
 echo "============================================================"
 echo "              auto-sec - настройка и защита сервера"
