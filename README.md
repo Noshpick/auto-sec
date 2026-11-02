@@ -12,6 +12,7 @@ Turns a bare VPS into a server with sensible baseline security in a couple of mi
 - Creates a non-privileged user with `sudo` and an SSH key (asks for the name interactively, with confirmation)
 - Moves SSH to a custom port (asks, default `2222`), disables root and password login - key only
 - Enables the firewall (`ufw`): denies everything inbound except SSH
+- Optionally opens extra ports - you can type a comma-separated list (`80,443,8080`) or press Enter to keep only SSH
 - Installs and configures `fail2ban`: 5 failed login attempts in 10 minutes = 1 hour ban
 - Enables automatic security updates (`unattended-upgrades`)
 - Optionally installs Docker
@@ -68,6 +69,13 @@ sudo systemctl restart ssh
 # Disable the firewall
 sudo ufw disable
 ```
+
+## Roadmap
+
+- [x] Interactive setup: user, SSH port, SSH key, fail2ban, firewall, auto-updates
+- [x] Extra ports as a comma-separated list (or Enter for defaults)
+- [ ] Audit mode `--check` - inspect the server and print a report without changing anything
+- [ ] Rollback mode `--rollback` - restore the previous SSH config automatically
 
 ## Project security
 
