@@ -16,6 +16,7 @@ Turns a bare VPS into a server with sensible baseline security in a couple of mi
 - Installs and configures `fail2ban`: 5 failed login attempts in 10 minutes = 1 hour ban
 - Enables automatic security updates (`unattended-upgrades`)
 - Optionally installs Docker
+- Audit mode (`--check`): inspects the server and prints a colored report without changing anything
 
 Before touching SSH it backs up the config (`/etc/ssh/sshd_config.bak.*`) and validates
 the new config with `sshd -t` **before** restarting the service - you will not lock yourself out.
@@ -74,7 +75,7 @@ sudo ufw disable
 
 - [x] Interactive setup: user, SSH port, SSH key, fail2ban, firewall, auto-updates
 - [x] Extra ports as a comma-separated list (or Enter for defaults)
-- [ ] Audit mode `--check` - inspect the server and print a report without changing anything
+- [x] Audit mode `--check` - inspect the server and print a report without changing anything
 - [ ] Rollback mode `--rollback` - restore the previous SSH config automatically
 
 ## Project security

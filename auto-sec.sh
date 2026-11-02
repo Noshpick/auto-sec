@@ -313,9 +313,77 @@ install_docker() {
     log "Docker installed, $NEW_USER added to the docker group"
 }
 
+OK_COUNT=0
+BAD_COUNT=0
+
+check_item() {
+    if [[ "$2" -eq 0 ]]; then
+        echo -e "${GREEN}[OK]${NC} $1"
+        (( OK_COUNT+=1 ))
+    else
+        echo -e "${RED}[!!]${NC} $1"
+        (( BAD_COUNT+=1 ))
+    fi
+}
+
+audit_report() {
+    echo "============================================================"
+    echo "              auto-sec - server audit"
+    echo "============================================================"
+
+    local sshd_conf st
+    sshd_conf=$(sshd -T 2>/dev/null || true)
+
+    local port root_login pass_auth
+    port=$(awk '/^port /{print $2}' <<< "$sshd_conf")
+    root_login=$(awk '/^permitrootlogin /{print $2}' <<< "$sshd_conf")
+    pass_auth=$(awk '/^passwordauthentication /{print $2}' <<< "$sshd_conf")
+
+    [[ "$port" != "22" ]] && st=0 || st=1
+    check_item "SSH on a non-standard port (current: ${port:-unknown})" "$st"
+
+    [[ "$root_login" == "no" ]] && st=0 || st=1
+    check_item "Root login disabled" "$st"
+
+    [[ "$pass_auth" == "no" ]] && st=0 || st=1
+    check_item "Password login disabled (keys only)" "$st"
+
+    ufw status 2>/dev/null | grep -q "Status: active" && st=0 || st=1
+    check_item "Firewall (ufw) enabled" "$st"
+
+    systemctl is-active --quiet fail2ban && st=0 || st=1
+    check_item "Fail2ban running" "$st"
+
+    systemctl is-enabled --quiet fail2ban && st=0 || st=1
+    check_item "Fail2ban enabled at boot" "$st"
+
+    [[ -f /etc/apt/apt.conf.d/20auto-upgrades ]] && st=0 || st=1
+    check_item "Automatic security updates configured" "$st"
+
+    local updates
+    updates=$(apt-get -s upgrade 2>/dev/null | grep -c '^Inst' || true)
+    [[ "$updates" == "0" ]] && st=0 || st=1
+    check_item "System up to date (updates available: $updates)" "$st"
+
+    echo "============================================================"
+    if (( BAD_COUNT == 0 )); then
+        echo -e "${GREEN}Result: $OK_COUNT/$((OK_COUNT + BAD_COUNT)) - server looks good${NC}"
+    else
+        echo -e "${YELLOW}Result: $OK_COUNT/$((OK_COUNT + BAD_COUNT)) - $BAD_COUNT issues found, run auto-sec to fix${NC}"
+    fi
+    echo "============================================================"
+}
+
 if [[ $EUID -ne 0 ]]; then
     die "Run me with sudo:  sudo bash auto-sec.sh"
 fi
+
+case "${1:-}" in
+    --check)
+        audit_report
+        exit 0
+        ;;
+esac
 
 echo "============================================================"
 echo "          auto-sec - server setup and hardening"
