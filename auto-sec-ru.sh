@@ -12,7 +12,7 @@ NEW_USER=""
 SSH_PUBKEY=""
 TIMEZONE="Europe/Moscow"
 INSTALL_DOCKER="no"
-OPEN_WEB_PORTS="no"
+EXTRA_PORTS=()
 DEFAULT_MAXRETRY="5"
 F2B_MAXRETRY=""
 
@@ -127,13 +127,44 @@ ask_ssh_key() {
     log "Ключ принят"
 }
 
-ask_web_ports() {
-    if ask_yes_no "Планируешь поднимать веб-сервер? (открыть порты 80 и 443)"; then
-        OPEN_WEB_PORTS="yes"
-        log "Порты 80 (HTTP) и 443 (HTTPS) будут открыты"
-    else
-        log "Веб-порты открывать не будем (только SSH)"
-    fi
+ask_extra_ports() {
+    while true; do
+        read -r -p "Дополнительные порты через запятую (например 80,443,8080), Enter - пропустить: " ports_input < /dev/tty
+
+        if [[ -z "$ports_input" ]]; then
+            log "Дополнительные порты не открываем (только SSH)"
+            return
+        fi
+
+        local raw_ports
+        IFS=',' read -ra raw_ports <<< "$ports_input"
+
+        local p
+        local valid=true
+        EXTRA_PORTS=()
+        for p in "${raw_ports[@]}"; do
+            p="${p//[[:space:]]/}"
+
+            if [[ ! "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
+                echo "Некорректный порт: '$p'. Нужны числа от 1 до 65535 через запятую."
+                valid=false
+                break
+            fi
+
+            if [[ "$p" == "$SSH_PORT" ]]; then
+                warn "Порт $p - это SSH-порт, он и так будет открыт. Пропускаю."
+                continue
+            fi
+
+            EXTRA_PORTS+=("$p")
+        done
+
+        if [[ "$valid" == true ]]; then
+            break
+        fi
+    done
+
+    log "Будут открыты порты: $SSH_PORT (SSH) и ${EXTRA_PORTS[*]}"
 }
 
 ask_maxretry() {
@@ -226,15 +257,17 @@ setup_firewall() {
     ufw default allow outgoing
     ufw allow "$SSH_PORT"/tcp comment 'SSH'
 
-    if [[ "$OPEN_WEB_PORTS" == "yes" ]]; then
-        ufw allow 80/tcp  comment 'HTTP'
-        ufw allow 443/tcp comment 'HTTPS'
+    if (( ${#EXTRA_PORTS[@]} > 0 )); then
+        local p
+        for p in "${EXTRA_PORTS[@]}"; do
+            ufw allow "$p"/tcp comment "custom"
+        done
     fi
 
     ufw --force enable
 
-    if [[ "$OPEN_WEB_PORTS" == "yes" ]]; then
-        log "Firewall включён: открыты порты $SSH_PORT (SSH), 80 (HTTP), 443 (HTTPS)"
+    if (( ${#EXTRA_PORTS[@]} > 0 )); then
+        log "Firewall включён: открыты порты $SSH_PORT (SSH) и ${EXTRA_PORTS[*]}"
     else
         log "Firewall включён: открыт только порт $SSH_PORT (SSH)"
     fi
@@ -293,7 +326,7 @@ echo
 ask_username
 ask_ssh_port
 ask_ssh_key
-ask_web_ports
+ask_extra_ports
 ask_maxretry
 
 if ask_yes_no "Установить Docker?"; then

@@ -12,7 +12,7 @@ NEW_USER=""
 SSH_PUBKEY=""
 TIMEZONE="Europe/Moscow"
 INSTALL_DOCKER="no"
-OPEN_WEB_PORTS="no"
+EXTRA_PORTS=()
 DEFAULT_MAXRETRY="5"
 F2B_MAXRETRY=""
 
@@ -127,13 +127,44 @@ ask_ssh_key() {
     log "Key accepted"
 }
 
-ask_web_ports() {
-    if ask_yes_no "Planning to run a web server? (open ports 80 and 443)"; then
-        OPEN_WEB_PORTS="yes"
-        log "Ports 80 (HTTP) and 443 (HTTPS) will be opened"
-    else
-        log "Web ports will stay closed (SSH only)"
-    fi
+ask_extra_ports() {
+    while true; do
+        read -r -p "Extra ports, comma-separated (e.g. 80,443,8080), Enter - skip: " ports_input < /dev/tty
+
+        if [[ -z "$ports_input" ]]; then
+            log "No extra ports (SSH only)"
+            return
+        fi
+
+        local raw_ports
+        IFS=',' read -ra raw_ports <<< "$ports_input"
+
+        local p
+        local valid=true
+        EXTRA_PORTS=()
+        for p in "${raw_ports[@]}"; do
+            p="${p//[[:space:]]/}"
+
+            if [[ ! "$p" =~ ^[0-9]+$ ]] || (( p < 1 || p > 65535 )); then
+                echo "Invalid port: '$p'. Numbers from 1 to 65535, comma-separated."
+                valid=false
+                break
+            fi
+
+            if [[ "$p" == "$SSH_PORT" ]]; then
+                warn "Port $p is the SSH port, it will be opened anyway. Skipping."
+                continue
+            fi
+
+            EXTRA_PORTS+=("$p")
+        done
+
+        if [[ "$valid" == true ]]; then
+            break
+        fi
+    done
+
+    log "Ports to open: $SSH_PORT (SSH) and ${EXTRA_PORTS[*]}"
 }
 
 ask_maxretry() {
@@ -202,7 +233,6 @@ setup_ssh() {
     cp /etc/ssh/sshd_config "/etc/ssh/sshd_config.bak.$(date +%Y%m%d%H%M%S)"
 
     cat > "$dropin" <<EOF
-# --- settings from auto-sec ---
 Port $SSH_PORT
 PermitRootLogin no
 PasswordAuthentication no
@@ -227,15 +257,17 @@ setup_firewall() {
     ufw default allow outgoing
     ufw allow "$SSH_PORT"/tcp comment 'SSH'
 
-    if [[ "$OPEN_WEB_PORTS" == "yes" ]]; then
-        ufw allow 80/tcp  comment 'HTTP'
-        ufw allow 443/tcp comment 'HTTPS'
+    if (( ${#EXTRA_PORTS[@]} > 0 )); then
+        local p
+        for p in "${EXTRA_PORTS[@]}"; do
+            ufw allow "$p"/tcp comment "custom"
+        done
     fi
 
     ufw --force enable
 
-    if [[ "$OPEN_WEB_PORTS" == "yes" ]]; then
-        log "Firewall enabled: ports $SSH_PORT (SSH), 80 (HTTP), 443 (HTTPS) open"
+    if (( ${#EXTRA_PORTS[@]} > 0 )); then
+        log "Firewall enabled: ports $SSH_PORT (SSH) and ${EXTRA_PORTS[*]} open"
     else
         log "Firewall enabled: only port $SSH_PORT (SSH) open"
     fi
@@ -294,7 +326,7 @@ echo
 ask_username
 ask_ssh_port
 ask_ssh_key
-ask_web_ports
+ask_extra_ports
 ask_maxretry
 
 if ask_yes_no "Install Docker?"; then
